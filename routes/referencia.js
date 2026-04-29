@@ -2,7 +2,7 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../db/connection');
 
-// GET /api/referencia/nanda  — lista diagnósticos (com busca textual)
+// GET /api/referencia/nanda
 router.get('/nanda', async (req, res) => {
     const { q } = req.query;
     try {
@@ -22,8 +22,7 @@ router.get('/nanda', async (req, res) => {
     }
 });
 
-// GET /api/referencia/nanda/:codigo/sugestoes  — NIC e NOC sugeridos para um diagnóstico
-// Alimenta o painel direito da Aba 3 do PWA
+// GET /api/referencia/nanda/:codigo/sugestoes
 router.get('/nanda/:codigo/sugestoes', async (req, res) => {
     const { codigo } = req.params;
     try {
@@ -31,7 +30,11 @@ router.get('/nanda/:codigo/sugestoes', async (req, res) => {
             pool.query(
                 `SELECT mn.id_mapa_nanda_nic, mn.prioridade_sugerida,
                         in2.codigo_nic, in2.nic_id_lc, in2.nome_intervencao,
-                        mn.atividades_profissionais, mn.orientacao_paciente_sugerida
+                        in2.atividade_profissional,
+                        in2.orientacao_paciente,
+                        in2.contexto_uso          AS orientacao_enfermagem,
+                        mn.atividades_profissionais,
+                        mn.orientacao_paciente_sugerida
                  FROM   mapa_nanda_nic mn
                  JOIN   intervencoes_nic in2 ON in2.codigo_nic = mn.codigo_nic
                  WHERE  mn.codigo_nanda = $1 AND mn.ativo = true
@@ -39,9 +42,7 @@ router.get('/nanda/:codigo/sugestoes', async (req, res) => {
             ),
             pool.query(
                 `SELECT mn.id_mapa_nanda_noc, mn.prioridade_sugerida,
-                        rn.codigo_noc, rn.noc_id_lc, rn.nome_resultado,
-                        mn.indicadores_mensuraveis, mn.criterio_avaliacao_sugerido,
-                        mn.janela_reavaliacao_sugerida
+                        rn.codigo_noc, rn.noc_id_lc, rn.nome_resultado
                  FROM   mapa_nanda_noc mn
                  JOIN   resultados_noc rn ON rn.codigo_noc = mn.codigo_noc
                  WHERE  mn.codigo_nanda = $1 AND mn.ativo = true
