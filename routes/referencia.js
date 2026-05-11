@@ -32,7 +32,7 @@ router.get('/nanda/:codigo/sugestoes', async (req, res) => {
                         in2.codigo_nic, in2.nic_id_lc, in2.nome_intervencao,
                         in2.atividade_profissional,
                         in2.orientacao_paciente,
-                        in2.contexto_uso          AS orientacao_enfermagem,
+                        in2.contexto_uso,
                         mn.atividades_profissionais,
                         mn.orientacao_paciente_sugerida
                  FROM   mapa_nanda_nic mn
