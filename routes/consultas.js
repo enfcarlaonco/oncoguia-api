@@ -214,6 +214,48 @@ router.post('/:id/concluir', async (req, res) => {
     }
 });
 
+// GET /api/consultas/paciente/:id_paciente/ultima-concluida  — retorna última consulta concluída com plano
+router.get('/paciente/:id_paciente/ultima-concluida', async (req, res) => {
+    const { id_paciente } = req.params;
+    try {
+        const consulta = await pool.query(
+            `SELECT id_consulta, data_hora, classificacao_risco_validada, plano_cuidado_resumido, conduta_seguimento_definida
+             FROM consultas_enfermagem
+             WHERE id_paciente = $1 AND status_consulta = 'concluida'
+             ORDER BY data_hora DESC LIMIT 1`,
+            [id_paciente]
+        );
+        if (!consulta.rowCount) return res.json(null);
+        const id = consulta.rows[0].id_consulta;
+        const [diagnosticos, intervencoes] = await Promise.all([
+            pool.query(
+                `SELECT cd.codigo_nanda, dn.titulo_diagnostico
+                 FROM consulta_diagnosticos cd
+                 JOIN diagnosticos_nanda dn ON dn.codigo_nanda = cd.codigo_nanda
+                 WHERE cd.id_consulta = $1 ORDER BY cd.prioridade`, [id]
+            ),
+            pool.query(
+                `SELECT ci.codigo_nic, in2.nome_intervencao
+                 FROM consulta_intervencoes ci
+                 JOIN intervencoes_nic in2 ON in2.codigo_nic = ci.codigo_nic
+                 WHERE ci.id_consulta = $1`, [id]
+            )
+        ]);
+        res.json({
+            id_consulta: id,
+            data_hora: consulta.rows[0].data_hora,
+            risco: consulta.rows[0].classificacao_risco_validada,
+            resumo: consulta.rows[0].plano_cuidado_resumido,
+            conduta: consulta.rows[0].conduta_seguimento_definida,
+            diagnosticos: diagnosticos.rows,
+            intervencoes: intervencoes.rows
+        });
+    } catch (err) {
+        console.error('[consultas.ultima]', err.message);
+        res.status(500).json({ erro: 'Erro ao carregar última consulta.' });
+    }
+});
+
 // GET /api/consultas/:id/plano  — retorna o plano para carregar na Aba Seguimento
 router.get('/:id/plano', async (req, res) => {
     const { id } = req.params;
