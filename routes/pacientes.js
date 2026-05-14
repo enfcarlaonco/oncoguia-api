@@ -2,10 +2,9 @@ const express = require('express');
 const router  = express.Router();
 const pool    = require('../db/connection');
 
-// GET /api/pacientes/busca?q=123456  — busca por registro ou iniciais
+// GET /api/pacientes/busca?q=123456  — busca por registro ou iniciais (q vazio retorna todos)
 router.get('/busca', async (req, res) => {
     const { q } = req.query;
-    if (!q) return res.status(400).json({ erro: 'Parâmetro de busca obrigatório.' });
 
     try {
         const result = await pool.query(
@@ -13,11 +12,12 @@ router.get('/busca', async (req, res) => {
                     diagnostico_oncologico, protocolo_atual, ciclo_atual,
                     status_paciente
              FROM   pacientes
-             WHERE  registro_instituicao ILIKE $1
-                OR  iniciais_nome        ILIKE $1
+             WHERE  ($1::text = '' OR $1 IS NULL
+                     OR registro_instituicao ILIKE '%' || $1 || '%'
+                     OR iniciais_nome        ILIKE '%' || $1 || '%')
              ORDER  BY updated_at DESC
-             LIMIT  20`,
-            [`%${q}%`]
+             LIMIT  200`,
+            [q ?? '']
         );
         res.json(result.rows);
     } catch (err) {

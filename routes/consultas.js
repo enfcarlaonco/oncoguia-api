@@ -159,7 +159,8 @@ router.post('/:id/concluir', async (req, res) => {
         // Para gerar tarefa automática:
         tipo_tarefa,         // ex: 'contato_telefonico'
         data_prevista_tarefa,
-        prioridade_tarefa
+        prioridade_tarefa,
+        responsavel
     } = req.body;
 
     const client = await pool.connect();
@@ -194,10 +195,10 @@ router.post('/:id/concluir', async (req, res) => {
         if (tipo_tarefa && id_paciente) {
             const tarefa = await client.query(
                 `INSERT INTO tarefas_assistenciais
-                    (id_paciente, origem, origem_clinica_id, tipo_tarefa, data_prevista, prioridade, status)
-                 VALUES ($1, 'consulta', $2, $3, $4, $5, 'pendente')
+                    (id_paciente, origem, origem_clinica_id, tipo_tarefa, data_prevista, prioridade, status, responsavel)
+                 VALUES ($1, 'consulta', $2, $3, $4, $5, 'pendente', $6)
                  RETURNING id_tarefa`,
-                [id_paciente, id, tipo_tarefa, data_prevista_tarefa ?? null, prioridade_tarefa ?? 'padrao']
+                [id_paciente, id, tipo_tarefa, data_prevista_tarefa ?? null, prioridade_tarefa ?? 'padrao', responsavel ?? null]
             );
             id_tarefa = tarefa.rows[0].id_tarefa;
         }
