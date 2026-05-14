@@ -8,6 +8,7 @@ const consultasRouter   = require('./routes/consultas');
 const seguimentosRouter = require('./routes/seguimentos');
 const tarefasRouter     = require('./routes/tarefas');
 const referenciaRouter  = require('./routes/referencia');
+const adminRouter       = require('./routes/admin');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
@@ -31,6 +32,7 @@ app.use('/api/consultas',   consultasRouter);
 app.use('/api/seguimentos', seguimentosRouter);
 app.use('/api/tarefas',     tarefasRouter);
 app.use('/api/referencia',  referenciaRouter);
+app.use('/api/admin',       adminRouter);
 
 // Health-check
 app.get('/health', (_req, res) => {
