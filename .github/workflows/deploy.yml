@@ -22,8 +22,20 @@ jobs:
       - name: Instalar Railway CLI
         run: npm install -g @railway/cli
 
+      - name: Verificar versao Railway CLI
+        run: railway --version
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+
+      - name: Verificar projeto Railway
+        run: railway status || true
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+
       - name: Deploy para Railway
-        run: railway up --service oncoguia-api --detach
+        run: railway up --service oncoguia-api --environment production --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
           RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
