@@ -50,11 +50,13 @@ router.post('/', async (req, res) => {
 // PUT /api/consultas/:id/sintomas  — salva triagem CTCAE (Aba 2)
 router.put('/:id/sintomas', async (req, res) => {
     const { id } = req.params;
-    const { sintomas, classificacao_risco_automatica } = req.body;
+    const { sintomas, classificacao_risco_automatica, updated_by_user_name } = req.body;
     // sintomas: [{ tipo_sintoma, grau_ctcae, alerta_risco, observacao }]
 
     if (!Array.isArray(sintomas))
         return res.status(400).json({ erro: 'sintomas deve ser um array.' });
+    if (!updated_by_user_name)
+        return res.status(401).json({ erro: 'Usuário não autenticado.' });
 
     const client = await pool.connect();
     try {
@@ -71,15 +73,15 @@ router.put('/:id/sintomas', async (req, res) => {
                 [id, s.tipo_sintoma, s.grau_ctcae, s.alerta_risco ?? false, s.observacao ?? null]
             );
         }
-        // Atualiza classificação automática calculada no front-end
-        if (classificacao_risco_automatica) {
-            await client.query(
-                `UPDATE consultas_enfermagem
-                 SET classificacao_risco_automatica = $1, updated_at = NOW()
-                 WHERE id_consulta = $2`,
-                [classificacao_risco_automatica, id]
-            );
-        }
+        // Atualiza classificação automática e autoria da edição
+        await client.query(
+            `UPDATE consultas_enfermagem
+             SET classificacao_risco_automatica = COALESCE($1, classificacao_risco_automatica),
+                 updated_by_user_name           = COALESCE($3, updated_by_user_name),
+                 updated_at                     = NOW()
+             WHERE id_consulta = $2`,
+            [classificacao_risco_automatica ?? null, id, updated_by_user_name ?? null]
+        );
         await client.query('COMMIT');
         res.json({ ok: true, registros: sintomas.length });
     } catch (err) {
@@ -94,10 +96,13 @@ router.put('/:id/sintomas', async (req, res) => {
 // PUT /api/consultas/:id/plano  — salva diagnósticos NANDA + NIC + NOC (Aba 3)
 router.put('/:id/plano', async (req, res) => {
     const { id } = req.params;
-    const { diagnosticos, intervencoes, resultados_esperados } = req.body;
+    const { diagnosticos, intervencoes, resultados_esperados, updated_by_user_name } = req.body;
     // diagnosticos: [{ codigo_nanda, dx_id_lc, prioridade, origem }]
     // intervencoes: [{ codigo_nic, nic_id_lc, tipo_intervencao, executada_na_consulta }]
     // resultados_esperados: [{ codigo_noc, noc_id_lc, criterio_avaliacao_personalizado }]
+
+    if (!updated_by_user_name)
+        return res.status(401).json({ erro: 'Usuário não autenticado.' });
 
     const client = await pool.connect();
     try {
@@ -135,6 +140,14 @@ router.put('/:id/plano', async (req, res) => {
                 );
             }
         }
+
+        await client.query(
+            `UPDATE consultas_enfermagem
+             SET updated_by_user_name = COALESCE($1, updated_by_user_name),
+                 updated_at           = NOW()
+             WHERE id_consulta = $2`,
+            [updated_by_user_name, id]
+        );
 
         await client.query('COMMIT');
         res.json({ ok: true });
