@@ -6,6 +6,83 @@ const pool       = require('./db/connection');
 
 async function runMigrations() {
     const stmts = [
+        // ── 1.1  Nova tabela: consulta_orientacoes ──────────────────────────────
+        `CREATE TABLE IF NOT EXISTS consulta_orientacoes (
+            id_orientacao   SERIAL          PRIMARY KEY,
+            id_consulta     INTEGER         NOT NULL
+                            REFERENCES consultas_enfermagem(id_consulta) ON DELETE CASCADE,
+            codigo_nic      INTEGER         REFERENCES intervencoes_nic(codigo_nic),
+            tipo            VARCHAR(20)     NOT NULL,
+            texto           TEXT            NOT NULL,
+            created_at      TIMESTAMPTZ     DEFAULT NOW()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_orientacoes_consulta
+            ON consulta_orientacoes(id_consulta)`,
+
+        // ── 1.2  Tabelas do schema que podem não estar no Railway ───────────────
+        `CREATE TABLE IF NOT EXISTS consulta_comorbidades (
+            id_consulta_comorbidade SERIAL      PRIMARY KEY,
+            id_consulta             INTEGER     NOT NULL
+                                    REFERENCES consultas_enfermagem(id_consulta) ON DELETE CASCADE,
+            tipo_comorbidade        VARCHAR(50) NOT NULL,
+            descricao_outro         TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS consulta_exame_fisico (
+            id_exame_fisico             SERIAL      PRIMARY KEY,
+            id_consulta                 INTEGER     NOT NULL UNIQUE
+                                        REFERENCES consultas_enfermagem(id_consulta) ON DELETE CASCADE,
+            pressao_arterial            VARCHAR(15),
+            frequencia_cardiaca         SMALLINT,
+            frequencia_respiratoria     SMALLINT,
+            temperatura_axilar          NUMERIC(4,1),
+            saturacao_o2                SMALLINT,
+            hidratacao                  VARCHAR(20),
+            mucosa_oral                 VARCHAR(30),
+            observacoes_exame_fisico    TEXT
+        )`,
+        `CREATE TABLE IF NOT EXISTS consulta_exames_laboratoriais (
+            id_exame_lab        SERIAL          PRIMARY KEY,
+            id_consulta         INTEGER         NOT NULL UNIQUE
+                                REFERENCES consultas_enfermagem(id_consulta) ON DELETE CASCADE,
+            data_hemograma      DATE,
+            leucocitos          NUMERIC(6,2),
+            neutrofilos         NUMERIC(6,2),
+            plaquetas           NUMERIC(6,2),
+            hemoglobina         NUMERIC(4,1),
+            creatinina          NUMERIC(5,2)
+        )`,
+        `CREATE TABLE IF NOT EXISTS planos_seguimento (
+            id_plano_seguimento SERIAL          PRIMARY KEY,
+            id_consulta         INTEGER         NOT NULL
+                                REFERENCES consultas_enfermagem(id_consulta) ON DELETE CASCADE,
+            id_paciente         INTEGER         NOT NULL
+                                REFERENCES pacientes(id_paciente),
+            tipo_seguimento     VARCHAR(30),
+            data_prevista       DATE,
+            hora_prevista       TIME,
+            responsavel         TEXT,
+            prioridade          VARCHAR(20),
+            status              VARCHAR(20)     DEFAULT 'pendente',
+            observacao          TEXT,
+            created_at          TIMESTAMPTZ     DEFAULT NOW()
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_planos_seguimento_paciente
+            ON planos_seguimento(id_paciente)`,
+        `CREATE TABLE IF NOT EXISTS pendencias_paciente (
+            id_pendencia        SERIAL          PRIMARY KEY,
+            id_paciente         INTEGER         NOT NULL
+                                REFERENCES pacientes(id_paciente),
+            tipo_pendencia      VARCHAR(40),
+            descricao           TEXT,
+            data_abertura       TIMESTAMPTZ     DEFAULT NOW(),
+            status              VARCHAR(20)     DEFAULT 'aberta',
+            data_fechamento     TIMESTAMPTZ,
+            responsavel         TEXT
+        )`,
+        `CREATE INDEX IF NOT EXISTS idx_pendencias_paciente
+            ON pendencias_paciente(id_paciente)`,
+
+        // ── 1.3  Colunas de auditoria (já existentes no bloco anterior) ─────────
         'ALTER TABLE consultas_enfermagem    ADD COLUMN IF NOT EXISTS completed_by_user_name TEXT',
         'ALTER TABLE consultas_enfermagem    ADD COLUMN IF NOT EXISTS completed_at           TIMESTAMPTZ',
         'ALTER TABLE consultas_enfermagem    ADD COLUMN IF NOT EXISTS updated_by_user_name   TEXT',
@@ -13,11 +90,16 @@ async function runMigrations() {
         'ALTER TABLE tarefas_assistenciais   ADD COLUMN IF NOT EXISTS completed_by_user_name TEXT',
         'ALTER TABLE tarefas_assistenciais   ADD COLUMN IF NOT EXISTS updated_by_user_name   TEXT',
         'ALTER TABLE seguimentos_enfermagem  ADD COLUMN IF NOT EXISTS created_by_user_name   TEXT',
+
+        // ── 1.3  Novas colunas de auditoria ─────────────────────────────────────
+        'ALTER TABLE seguimentos_enfermagem  ADD COLUMN IF NOT EXISTS updated_by_user_name   TEXT',
+        'ALTER TABLE pacientes               ADD COLUMN IF NOT EXISTS created_by_user_name   TEXT',
+        'ALTER TABLE pacientes               ADD COLUMN IF NOT EXISTS updated_by_user_name   TEXT',
     ];
     for (const sql of stmts) {
         try { await pool.query(sql); } catch (e) { console.warn('[migration warn]', e.message); }
     }
-    console.log('[OncoGuia API] Migrações de auditoria verificadas.');
+    console.log('[OncoGuia API] Migrações Fase 1 verificadas.');
 }
 
 const pacientesRouter   = require('./routes/pacientes');
