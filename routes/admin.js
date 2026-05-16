@@ -77,4 +77,53 @@ router.post('/migrate-col-f', async (req, res) => {
     }
 });
 
+// GET /api/admin/verificar-fase1?secret=oncoguia2024
+// Somente leitura — verifica se as migrations da Fase 1 foram aplicadas
+router.get('/verificar-fase1', async (req, res) => {
+    if (req.query.secret !== 'oncoguia2024') {
+        return res.status(401).json({ erro: 'Não autorizado.' });
+    }
+    try {
+        const [tabelas, colunasOrientacoes, tabelasCompl, colunaAuditoria] = await Promise.all([
+            pool.query(`
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_name = 'consulta_orientacoes'`),
+            pool.query(`
+                SELECT column_name, data_type FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = 'consulta_orientacoes'
+                ORDER BY ordinal_position`),
+            pool.query(`
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name IN (
+                    'consulta_comorbidades','consulta_exame_fisico',
+                    'consulta_exames_laboratoriais','planos_seguimento','pendencias_paciente'
+                  )
+                ORDER BY table_name`),
+            pool.query(`
+                SELECT table_name, column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND (
+                    (table_name = 'consultas_enfermagem'
+                     AND column_name IN ('completed_by_user_name','completed_at','updated_by_user_name'))
+                    OR (table_name = 'tarefas_assistenciais'
+                     AND column_name IN ('created_by_user_name','completed_by_user_name','updated_by_user_name'))
+                    OR (table_name = 'seguimentos_enfermagem'
+                     AND column_name IN ('created_by_user_name','updated_by_user_name'))
+                    OR (table_name = 'pacientes'
+                     AND column_name IN ('created_by_user_name','updated_by_user_name'))
+                )
+                ORDER BY table_name, column_name`)
+        ]);
+        res.json({
+            passo1_consulta_orientacoes_existe: tabelas.rows,
+            passo2_colunas_consulta_orientacoes: colunasOrientacoes.rows,
+            passo3_tabelas_complementares: tabelasCompl.rows,
+            passo4_colunas_auditoria: colunaAuditoria.rows
+        });
+    } catch (err) {
+        res.status(500).json({ erro: err.message });
+    }
+});
+
 module.exports = router;
