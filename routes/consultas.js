@@ -157,10 +157,11 @@ router.post('/:id/concluir', async (req, res) => {
         conduta_seguimento_definida,
         texto_copiavel_prontuario,
         // Para gerar tarefa automática:
-        tipo_tarefa,         // ex: 'contato_telefonico'
+        tipo_tarefa,
         data_prevista_tarefa,
         prioridade_tarefa,
-        responsavel
+        responsavel,
+        completed_by_user_name
     } = req.body;
 
     const client = await pool.connect();
@@ -177,12 +178,14 @@ router.post('/:id/concluir', async (req, res) => {
                 texto_copiavel_prontuario    = $5,
                 gerou_tarefa                 = $6,
                 status_consulta              = 'concluida',
+                completed_by_user_name       = $8,
+                completed_at                 = NOW(),
                 updated_at                   = NOW()
              WHERE id_consulta = $7
              RETURNING id_paciente`,
             [classificacao_risco_validada, resumo_clinico, plano_cuidado_resumido,
              conduta_seguimento_definida, texto_copiavel_prontuario,
-             !!tipo_tarefa, id]
+             !!tipo_tarefa, id, completed_by_user_name ?? null]
         );
         if (upd.rowCount === 0) {
             await client.query('ROLLBACK');
@@ -195,8 +198,8 @@ router.post('/:id/concluir', async (req, res) => {
         if (tipo_tarefa && id_paciente) {
             const tarefa = await client.query(
                 `INSERT INTO tarefas_assistenciais
-                    (id_paciente, origem, origem_clinica_id, tipo_tarefa, data_prevista, prioridade, status, responsavel)
-                 VALUES ($1, 'consulta', $2, $3, $4, $5, 'pendente', $6)
+                    (id_paciente, origem, origem_clinica_id, tipo_tarefa, data_prevista, prioridade, status, responsavel, created_by_user_name)
+                 VALUES ($1, 'consulta', $2, $3, $4, $5, 'pendente', $6, $6)
                  RETURNING id_tarefa`,
                 [id_paciente, id, tipo_tarefa, data_prevista_tarefa ?? null, prioridade_tarefa ?? 'padrao', responsavel ?? null]
             );

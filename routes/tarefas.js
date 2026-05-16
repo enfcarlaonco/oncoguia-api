@@ -48,19 +48,20 @@ router.get('/', async (req, res) => {
 // PATCH /api/tarefas/:id  — atualiza status / conclui tarefa
 router.patch('/:id', async (req, res) => {
     const { id } = req.params;
-    const { status, conduta_realizada, efetividade, responsavel } = req.body;
+    const { status, conduta_realizada, efetividade, responsavel, completed_by_user_name } = req.body;
 
     try {
         const result = await pool.query(
             `UPDATE tarefas_assistenciais SET
-                status             = COALESCE($1, status),
-                conduta_realizada  = COALESCE($2, conduta_realizada),
-                efetividade        = COALESCE($3, efetividade),
-                responsavel        = COALESCE($4, responsavel),
-                data_conclusao     = CASE WHEN $1 = 'concluida' THEN NOW() ELSE data_conclusao END
+                status                  = COALESCE($1, status),
+                conduta_realizada       = COALESCE($2, conduta_realizada),
+                efetividade             = COALESCE($3, efetividade),
+                responsavel             = COALESCE($4, responsavel),
+                completed_by_user_name  = CASE WHEN $1 = 'concluida' THEN $6 ELSE completed_by_user_name END,
+                data_conclusao          = CASE WHEN $1 = 'concluida' THEN NOW() ELSE data_conclusao END
              WHERE id_tarefa = $5
              RETURNING *`,
-            [status ?? null, conduta_realizada ?? null, efetividade ?? null, responsavel ?? null, id]
+            [status ?? null, conduta_realizada ?? null, efetividade ?? null, responsavel ?? null, id, completed_by_user_name ?? null]
         );
         if (result.rowCount === 0) return res.status(404).json({ erro: 'Tarefa não encontrada.' });
         res.json(result.rows[0]);

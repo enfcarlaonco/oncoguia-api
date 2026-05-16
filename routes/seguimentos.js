@@ -16,10 +16,14 @@ router.post('/', async (req, res) => {
         efetividade,
         necessita_novo_seguimento,
         texto_copiavel_prontuario,
-        sintomas                  // [{ tipo_sintoma, grau_ctcae, melhorou_manteve_piorou, observacao }]
+        sintomas,                 // [{ tipo_sintoma, grau_ctcae, melhorou_manteve_piorou, observacao }]
+        created_by_user_name
     } = req.body;
 
     if (!id_paciente) return res.status(400).json({ erro: 'id_paciente obrigatório.' });
+
+    // created_by_user_name tem precedência; enfermeiro_oncologista é fallback legado
+    const autorNome = created_by_user_name || enfermeiro_oncologista || null;
 
     const client = await pool.connect();
     try {
@@ -29,13 +33,13 @@ router.post('/', async (req, res) => {
         const seg = await client.query(
             `INSERT INTO seguimentos_enfermagem
                 (id_paciente, id_consulta_origem, modalidade, momento_seguimento,
-                 ciclo_referencia, enfermeiro_oncologista,
+                 ciclo_referencia, enfermeiro_oncologista, created_by_user_name,
                  mini_triagem_resumo, conduta_realizada, efetividade,
                  necessita_novo_seguimento, texto_copiavel_prontuario, status_seguimento)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'concluido')
+             VALUES ($1,$2,$3,$4,$5,$6,$6,$7,$8,$9,$10,$11,'concluido')
              RETURNING id_seguimento, created_at`,
             [id_paciente, id_consulta_origem ?? null, modalidade, momento_seguimento,
-             ciclo_referencia, enfermeiro_oncologista,
+             ciclo_referencia, autorNome,
              mini_triagem_resumo, conduta_realizada, efetividade,
              necessita_novo_seguimento ?? false, texto_copiavel_prontuario]
         );
