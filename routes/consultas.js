@@ -230,6 +230,58 @@ router.post('/:id/concluir', async (req, res) => {
     }
 });
 
+// POST /api/consultas/:id/orientacoes  — salva orientações ao paciente e ao cuidador (Fase 3.3)
+router.post('/:id/orientacoes', async (req, res) => {
+    const { id } = req.params;
+    const { orientacoes, updated_by_user_name } = req.body;
+
+    if (!updated_by_user_name)
+        return res.status(401).json({ erro: 'Usuário não autenticado.' });
+    if (!Array.isArray(orientacoes))
+        return res.status(400).json({ erro: 'orientacoes deve ser um array.' });
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const existe = await client.query(
+            'SELECT id_consulta FROM consultas_enfermagem WHERE id_consulta = $1', [id]
+        );
+        if (!existe.rowCount) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ erro: 'Consulta não encontrada.' });
+        }
+
+        await client.query(
+            'DELETE FROM consulta_orientacoes WHERE id_consulta = $1', [id]
+        );
+
+        for (const o of orientacoes) {
+            await client.query(
+                `INSERT INTO consulta_orientacoes (id_consulta, codigo_nic, tipo, texto)
+                 VALUES ($1, $2, $3, $4)`,
+                [id, o.codigo_nic ?? null, o.tipo, o.texto]
+            );
+        }
+
+        await client.query(
+            `UPDATE consultas_enfermagem
+             SET updated_by_user_name = $1, updated_at = NOW()
+             WHERE id_consulta = $2`,
+            [updated_by_user_name, id]
+        );
+
+        await client.query('COMMIT');
+        res.json({ ok: true, registros: orientacoes.length });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('[consultas.orientacoes]', err.message);
+        res.status(500).json({ erro: 'Erro ao salvar orientações.' });
+    } finally {
+        client.release();
+    }
+});
+
 // GET /api/consultas/paciente/:id_paciente  — histórico de consultas do paciente
 router.get('/paciente/:id_paciente', async (req, res) => {
     const { id_paciente } = req.params;
