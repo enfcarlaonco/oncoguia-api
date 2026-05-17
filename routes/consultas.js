@@ -230,6 +230,27 @@ router.post('/:id/concluir', async (req, res) => {
     }
 });
 
+// GET /api/consultas/paciente/:id_paciente  — histórico de consultas do paciente
+router.get('/paciente/:id_paciente', async (req, res) => {
+    const { id_paciente } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT id_consulta, data_hora, tipo_consulta,
+                    classificacao_risco_automatica, classificacao_risco_validada,
+                    enfermeiro_oncologista, status_consulta,
+                    updated_by_user_name, updated_at
+             FROM consultas_enfermagem
+             WHERE id_paciente = $1
+             ORDER BY data_hora DESC`,
+            [id_paciente]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        console.error('[consultas.historico]', err.message);
+        res.status(500).json({ erro: 'Erro ao carregar histórico de consultas.' });
+    }
+});
+
 // GET /api/consultas/paciente/:id_paciente/ultima-concluida  — retorna última consulta concluída com plano
 router.get('/paciente/:id_paciente/ultima-concluida', async (req, res) => {
     const { id_paciente } = req.params;
@@ -304,6 +325,85 @@ router.get('/:id/plano', async (req, res) => {
     } catch (err) {
         console.error('[consultas.plano.get]', err.message);
         res.status(500).json({ erro: 'Erro ao carregar plano.' });
+    }
+});
+
+// GET /api/consultas/:id  — consulta completa com todos os subtables
+router.get('/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const base = await pool.query(
+            `SELECT * FROM consultas_enfermagem WHERE id_consulta = $1`,
+            [id]
+        );
+        if (!base.rowCount) return res.status(404).json({ erro: 'Consulta não encontrada.' });
+
+        const [
+            sintomas, diagnosticos, intervencoes,
+            resultados, orientacoes, exame_fisico,
+            exames_lab, plano_seguimento
+        ] = await Promise.all([
+            pool.query(
+                `SELECT tipo_sintoma, grau_ctcae, alerta_risco, observacao
+                 FROM consulta_sintomas_ctcae WHERE id_consulta = $1`, [id]
+            ),
+            pool.query(
+                `SELECT cd.codigo_nanda, cd.prioridade, cd.origem, dn.titulo_diagnostico
+                 FROM consulta_diagnosticos cd
+                 JOIN diagnosticos_nanda dn ON dn.codigo_nanda = cd.codigo_nanda
+                 WHERE cd.id_consulta = $1 ORDER BY cd.prioridade`, [id]
+            ),
+            pool.query(
+                `SELECT ci.codigo_nic, ci.tipo_intervencao, ci.executada_na_consulta,
+                        in2.nome_intervencao
+                 FROM consulta_intervencoes ci
+                 JOIN intervencoes_nic in2 ON in2.codigo_nic = ci.codigo_nic
+                 WHERE ci.id_consulta = $1`, [id]
+            ),
+            pool.query(
+                `SELECT cr.codigo_noc, cr.criterio_avaliacao_personalizado, rn.nome_resultado
+                 FROM consulta_resultados_esperados cr
+                 JOIN resultados_noc rn ON rn.codigo_noc = cr.codigo_noc
+                 WHERE cr.id_consulta = $1`, [id]
+            ),
+            pool.query(
+                `SELECT id_orientacao, codigo_nic, tipo, texto, created_at
+                 FROM consulta_orientacoes WHERE id_consulta = $1
+                 ORDER BY id_orientacao`, [id]
+            ),
+            pool.query(
+                `SELECT pressao_arterial, frequencia_cardiaca, frequencia_respiratoria,
+                        temperatura_axilar, saturacao_o2, hidratacao, mucosa_oral,
+                        observacoes_exame_fisico
+                 FROM consulta_exame_fisico WHERE id_consulta = $1`, [id]
+            ),
+            pool.query(
+                `SELECT data_hemograma, leucocitos, neutrofilos, plaquetas,
+                        hemoglobina, creatinina
+                 FROM consulta_exames_laboratoriais WHERE id_consulta = $1`, [id]
+            ),
+            pool.query(
+                `SELECT id_plano_seguimento, tipo_seguimento, data_prevista, hora_prevista,
+                        responsavel, prioridade, status, observacao, created_at
+                 FROM planos_seguimento WHERE id_consulta = $1
+                 ORDER BY data_prevista`, [id]
+            )
+        ]);
+
+        res.json({
+            consulta:           base.rows[0],
+            sintomas:           sintomas.rows,
+            diagnosticos:       diagnosticos.rows,
+            intervencoes:       intervencoes.rows,
+            resultados_esperados: resultados.rows,
+            orientacoes:        orientacoes.rows,
+            exame_fisico:       exame_fisico.rows[0] || null,
+            exames_laboratoriais: exames_lab.rows[0] || null,
+            plano_seguimento:   plano_seguimento.rows
+        });
+    } catch (err) {
+        console.error('[consultas.get]', err.message);
+        res.status(500).json({ erro: 'Erro ao carregar consulta.' });
     }
 });
 
