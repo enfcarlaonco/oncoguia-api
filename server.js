@@ -95,6 +95,9 @@ async function runMigrations() {
         'ALTER TABLE seguimentos_enfermagem  ADD COLUMN IF NOT EXISTS updated_by_user_name   TEXT',
         'ALTER TABLE pacientes               ADD COLUMN IF NOT EXISTS created_by_user_name   TEXT',
         'ALTER TABLE pacientes               ADD COLUMN IF NOT EXISTS updated_by_user_name   TEXT',
+
+        // ── Fase 6: coluna descricao em tarefas ───────────────────────────────
+        'ALTER TABLE tarefas_assistenciais   ADD COLUMN IF NOT EXISTS descricao              TEXT',
     ];
     for (const sql of stmts) {
         try { await pool.query(sql); } catch (e) { console.warn('[migration warn]', e.message); }
