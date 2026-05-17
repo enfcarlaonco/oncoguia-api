@@ -120,6 +120,7 @@ const consultasRouter   = require('./routes/consultas');
 const seguimentosRouter = require('./routes/seguimentos');
 const tarefasRouter     = require('./routes/tarefas');
 const pendenciasRouter  = require('./routes/pendencias');
+const painelRouter      = require('./routes/painel');
 const referenciaRouter  = require('./routes/referencia');
 const adminRouter       = require('./routes/admin');
 
@@ -145,6 +146,7 @@ app.use('/api/consultas',   consultasRouter);
 app.use('/api/seguimentos', seguimentosRouter);
 app.use('/api/tarefas',     tarefasRouter);
 app.use('/api/pendencias',  pendenciasRouter);
+app.use('/api/painel',      painelRouter);
 app.use('/api/referencia',  referenciaRouter);
 app.use('/api/admin',       adminRouter);
 
