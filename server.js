@@ -98,6 +98,16 @@ async function runMigrations() {
 
         // ── Fase 6: coluna descricao em tarefas ───────────────────────────────
         'ALTER TABLE tarefas_assistenciais   ADD COLUMN IF NOT EXISTS descricao              TEXT',
+
+        // ── Fase 7: colunas adicionais em pendencias_paciente ─────────────────
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS id_consulta_origem     INTEGER REFERENCES consultas_enfermagem(id_consulta)',
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS categoria              VARCHAR(40)',
+        `ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS prioridade             VARCHAR(20) DEFAULT 'moderada'`,
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS conduta_atual          TEXT',
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS created_by_user_name   TEXT',
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS resolved_by_user_name  TEXT',
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS resolved_at            TIMESTAMPTZ',
+        'ALTER TABLE pendencias_paciente ADD COLUMN IF NOT EXISTS created_at             TIMESTAMPTZ DEFAULT NOW()',
     ];
     for (const sql of stmts) {
         try { await pool.query(sql); } catch (e) { console.warn('[migration warn]', e.message); }
@@ -109,6 +119,7 @@ const pacientesRouter   = require('./routes/pacientes');
 const consultasRouter   = require('./routes/consultas');
 const seguimentosRouter = require('./routes/seguimentos');
 const tarefasRouter     = require('./routes/tarefas');
+const pendenciasRouter  = require('./routes/pendencias');
 const referenciaRouter  = require('./routes/referencia');
 const adminRouter       = require('./routes/admin');
 
@@ -133,6 +144,7 @@ app.use('/api/pacientes',   pacientesRouter);
 app.use('/api/consultas',   consultasRouter);
 app.use('/api/seguimentos', seguimentosRouter);
 app.use('/api/tarefas',     tarefasRouter);
+app.use('/api/pendencias',  pendenciasRouter);
 app.use('/api/referencia',  referenciaRouter);
 app.use('/api/admin',       adminRouter);
 
